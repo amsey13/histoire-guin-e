@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Quiz Guinée • Manette Joueur</title>
+  <!-- Google Fonts: Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <!-- Vue 3 & Socket.io -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    :root {
+      --gn-red: #CE1126;
+      --gn-yellow: #FCD116;
+      --gn-green: #009460;
+      --gn-bauxite: #8A1538;
+      --bg-cream: #F8F5EE;
+      --card-bg: #FFFFFF;
+      --text-dark: #1A1A1A;
+      --text-muted: #666666;
+      --border-radius-lg: 1.25rem;
+      --border-radius-xl: 1.75rem;
+      --shadow-premium: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 6px 10px -4px rgba(0, 0, 0, 0.04);
+      --shadow-elevated: 0 16px 32px -8px rgba(0, 0, 0, 0.15);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      background-color: var(--bg-cream);
+      color: var(--text-dark);
+      min-height: 100vh;
+      min-height: -webkit-fill-available;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow-x: hidden;
+      user-select: none;
+      /* Motif géométrique discret inspiré d'Afrique de l'Ouest */
+      background-image: 
+        radial-gradient(circle at 50% 50%, rgba(138, 21, 56, 0.04) 2px, transparent 2px),
+        repeating-linear-gradient(45deg, rgba(0, 148, 96, 0.02) 0, rgba(0, 148, 96, 0.02) 20px, transparent 20px, transparent 40px);
+      background-size: 32px 32px, 80px 80px;
+    }
+
+    /* Ruban tricolore au sommet */
+    .top-flag-bar {
+      height: 6px;
+      width: 100%;
+      display: flex;
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 100;
+    }
+    .top-flag-bar .stripe-red { flex: 1; background-color: var(--gn-red); }
+    .top-flag-bar .stripe-yellow { flex: 1; background-color: var(--gn-yellow); }
+    .top-flag-bar .stripe-green { flex: 1; background-color: var(--gn-green); }
+
+    #app {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      min-height: -webkit-fill-available;
+      padding-top: 6px;
+    }
+
+    /* Header Joueur minimaliste */
+    .mobile-header {
+      padding: 0.8rem 1.25rem;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(0,0,0,0.06);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 6px;
+      z-index: 90;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .flag-mini {
+      display: flex;
+      width: 24px;
+      height: 16px;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .flag-mini div { flex: 1; height: 100%; }
+
+    .app-title {
+      font-size: 1rem;
+      font-weight: 900;
+      background: linear-gradient(135deg, var(--gn-red), var(--gn-bauxite));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.02em;
+    }
+
+    .user-pill {
+      background: var(--bg-cream);
+      padding: 0.35rem 0.85rem;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 800;
+      color: var(--text-dark);
+      border: 1px solid rgba(0,0,0,0.08);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .score-badge {
+      color: var(--gn-bauxite);
+      font-weight: 900;
+    }
+
+    /* Corps principal */
+    .mobile-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 1rem 1.25rem;
+      max-width: 500px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    /* =========================================
+       1. ÉCRAN DE CONNEXION (PSEUDO)
+       ========================================= */
+    .login-container {
+      margin: auto 0;
+      display: flex;
+      flex-direction: column;
+      gap: 1.75rem;
+      text-align: center;
+    }
+
+    .login-card {
+      background: #FFFFFF;
+      border-radius: var(--border-radius-xl);
+      padding: 2.2rem 1.75rem;
+      box-shadow: var(--shadow-elevated);
+      border: 1px solid rgba(0,0,0,0.05);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .login-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 6px;
+      background: linear-gradient(90deg, var(--gn-red) 33.3%, var(--gn-yellow) 33.3%, var(--gn-yellow) 66.6%, var(--gn-green) 66.6%);
+    }
+
+    .login-icon {
+      font-size: 3rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .login-title {
+      font-size: 1.65rem;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.4rem;
+    }
+
+    .login-subtitle {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      margin-bottom: 1.8rem;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .input-pseudo {
+      width: 100%;
+      background: var(--bg-cream);
+      border: 2px solid rgba(0,0,0,0.08);
+      border-radius: var(--border-radius-lg);
+      padding: 1rem 1.25rem;
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--text-dark);
+      text-align: center;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    .input-pseudo:focus {
+      border-color: var(--gn-green);
+      background: #FFFFFF;
+      box-shadow: 0 0 0 4px rgba(0, 148, 96, 0.15);
+    }
+
+    .btn-join {
+      width: 100%;
+      background: linear-gradient(135deg, var(--gn-red), var(--gn-bauxite));
+      color: #FFFFFF;
+      border: none;
+      padding: 1.15rem;
+      font-size: 1.25rem;
+      font-weight: 900;
+      border-radius: var(--border-radius-lg);
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(206, 17, 38, 0.3);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    .btn-join:active {
+      transform: scale(0.98);
+      box-shadow: 0 4px 10px rgba(206, 17, 38, 0.25);
+    }
+
+    .error-msg {
+      background: #FEE2E2;
+      color: #B91C1C;
+      font-size: 0.9rem;
+      font-weight: 700;
+      padding: 0.75rem 1rem;
+      border-radius: 0.75rem;
+      margin-top: 1rem;
+    }
+
+    /* =========================================
+       2. ÉCRAN DE VOTE (GRILLE 2x2 SANS TEXTE)
+       ========================================= */
+    .voting-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+      height: 100%;
+    }
+
+    .voting-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #FFFFFF;
+      padding: 0.5rem 1rem;
+      border-radius: 999px;
+      box-shadow: var(--shadow-premium);
+    }
+
+    .voting-timer-pill {
+      font-size: 1.1rem;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .timer-alert {
+      color: var(--gn-red);
+      animation: pulseUrgent 0.8s infinite;
+    }
+
+    @keyframes pulseUrgent {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+    }
+
+    .voting-instruction {
+      font-size: 0.85rem;
+      font-weight: 800;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .gamepad-grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 0.85rem;
+      min-height: calc(100vh - 175px);
+    }
+
+    .gamepad-btn {
+      border: none;
+      border-radius: var(--border-radius-xl);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: var(--shadow-premium);
+      transition: transform 0.12s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.12s;
+      position: relative;
+      touch-action: manipulation;
+    }
+
+    .gamepad-btn:active {
+      transform: scale(0.93);
+    }
+
+    .gamepad-btn.btn-0 {
+      background-color: var(--gn-red);
+      color: #FFFFFF;
+      box-shadow: 0 10px 24px rgba(206, 17, 38, 0.35);
+    }
+
+    .gamepad-btn.btn-1 {
+      background-color: var(--gn-yellow);
+      color: #212121;
+      box-shadow: 0 10px 24px rgba(252, 209, 22, 0.4);
+    }
+
+    .gamepad-btn.btn-2 {
+      background-color: var(--gn-green);
+      color: #FFFFFF;
+      box-shadow: 0 10px 24px rgba(0, 148, 96, 0.35);
+    }
+
+    .gamepad-btn.btn-3 {
+      background-color: var(--gn-bauxite);
+      color: #FFFFFF;
+      box-shadow: 0 10px 24px rgba(138, 21, 56, 0.35);
+    }
+
+    .btn-icon-shape {
+      font-size: 3.5rem;
+      line-height: 1;
+      filter: drop-shadow(0 3px 6px rgba(0,0,0,0.18));
+      transition: transform 0.2s;
+    }
+
+    .gamepad-btn:active .btn-icon-shape {
+      transform: scale(1.15);
+    }
+
+    /* =========================================
+       3. ÉCRAN EN ATTENTE (RÉPONSE ENVOYÉE OU TEMPS ÉCOULÉ)
+       ========================================= */
+    .waiting-container {
+      margin: auto 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      background: #FFFFFF;
+      border-radius: var(--border-radius-xl);
+      padding: 3rem 2rem;
+      box-shadow: var(--shadow-elevated);
+      border: 1px solid rgba(0,0,0,0.05);
+      gap: 1.5rem;
+    }
+
+    .waiting-pulse-circle {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--gn-yellow), var(--gn-green));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.8rem;
+      box-shadow: 0 10px 25px rgba(0, 148, 96, 0.3);
+      animation: pulseGrow 2s infinite ease-in-out;
+    }
+
+    @keyframes pulseGrow {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+    }
+
+    .waiting-title {
+      font-size: 1.6rem;
+      font-weight: 900;
+      color: var(--text-dark);
+      letter-spacing: -0.02em;
+    }
+
+    .waiting-desc {
+      font-size: 1.05rem;
+      color: var(--text-muted);
+      line-height: 1.45;
+    }
+
+    /* =========================================
+       4. ÉCRAN RÉSULTAT DU JOUEUR
+       ========================================= */
+    .result-container {
+      margin: auto 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      border-radius: var(--border-radius-xl);
+      padding: 3rem 2rem;
+      box-shadow: var(--shadow-elevated);
+      gap: 1.5rem;
+      color: #FFFFFF;
+      animation: popResult 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .result-container.is-correct {
+      background: linear-gradient(135deg, var(--gn-green), #006843);
+      box-shadow: 0 16px 36px rgba(0, 148, 96, 0.35);
+    }
+
+    .result-container.is-wrong {
+      background: linear-gradient(135deg, var(--gn-red), var(--gn-bauxite));
+      box-shadow: 0 16px 36px rgba(206, 17, 38, 0.35);
+    }
+
+    @keyframes popResult {
+      from { transform: scale(0.85); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .result-emoji {
+      font-size: 4.5rem;
+      line-height: 1;
+    }
+
+    .result-title {
+      font-size: 2.2rem;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+    }
+
+    .result-pts {
+      background: rgba(255, 255, 255, 0.2);
+      padding: 0.5rem 1.5rem;
+      border-radius: 999px;
+      font-size: 1.35rem;
+      font-weight: 900;
+      letter-spacing: 0.05em;
+    }
+
+    .result-score-box {
+      font-size: 1.1rem;
+      font-weight: 700;
+      opacity: 0.95;
+    }
+
+    /* =========================================
+       5. ÉCRAN FIN / PODIUM
+       ========================================= */
+    .final-container {
+      margin: auto 0;
+      text-align: center;
+      background: #FFFFFF;
+      border-radius: var(--border-radius-xl);
+      padding: 3rem 2rem;
+      box-shadow: var(--shadow-elevated);
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .final-badge {
+      font-size: 4.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .final-title {
+      font-size: 2rem;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, var(--gn-red), var(--gn-bauxite));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .final-score-pill {
+      background: var(--bg-cream);
+      border: 2px dashed rgba(138, 21, 56, 0.25);
+      border-radius: var(--border-radius-lg);
+      padding: 1.25rem;
+      font-size: 1.5rem;
+      font-weight: 900;
+      color: var(--gn-bauxite);
+    }
+  </style>
+</head>
+<body>
+  <div class="top-flag-bar">
+    <div class="stripe-red"></div>
+    <div class="stripe-yellow"></div>
+    <div class="stripe-green"></div>
+  </div>
+
+  <div id="app">
+    <!-- Header Joueur -->
+    <header class="mobile-header">
+      <div class="brand-group">
+        <div class="flag-mini">
+          <div style="background-color: var(--gn-red)"></div>
+          <div style="background-color: var(--gn-yellow)"></div>
+          <div style="background-color: var(--gn-green)"></div>
+        </div>
+        <div class="app-title">Quiz Guinée</div>
+      </div>
+
+      <div v-if="player.isJoined" class="user-pill">
+        <span>👤 {{ player.nickname }}</span>
+        <span class="score-badge">• {{ player.score }} pts</span>
+      </div>
+    </header>
+
+    <main class="mobile-main">
+      <!-- =====================================
+           ÉTAPE 1 : CONNEXION PSEUDO
+           ===================================== -->
+      <section v-if="!player.isJoined" class="login-container">
+        <div class="login-card">
+          <div class="login-icon">🇬🇳</div>
+          <h1 class="login-title">Entre ton pseudo</h1>
+          <p class="login-subtitle">Prépare-toi à relever le défi de l'Histoire !</p>
+
+          <form @submit.prevent="joinGame" class="form-group">
+            <input 
+              v-model="inputNickname" 
+              type="text" 
+              class="input-pseudo" 
+              placeholder="Ex: Mansa, Camara, Aïcha..." 
+              maxlength="15" 
+              autofocus 
+              required
+            />
+            <button type="submit" class="btn-join">Rejoindre la partie</button>
+          </form>
+
+          <div v-if="errorMessage" class="error-msg">
+            {{ errorMessage }}
+          </div>
+        </div>
+      </section>
+
+      <!-- =====================================
+           ÉTAPE 2 : EN ATTENTE DANS LE LOBBY
+           ===================================== -->
+      <section v-else-if="currentScreen === 'LOBBY_WAIT'" class="waiting-container">
+        <div class="waiting-pulse-circle">📱</div>
+        <h2 class="waiting-title">Tu es dans la partie !</h2>
+        <p class="waiting-desc">
+          Regarde l'écran géant. L'animateur va bientôt lancer le quiz... Sois rapide pour gagner un max de points !
+        </p>
+      </section>
+
+      <!-- =====================================
+           ÉTAPE 3 : MANETTE DE VOTE (4 BOUTONS 2x2)
+           ===================================== -->
+      <section v-else-if="currentScreen === 'VOTING'" class="voting-container">
+        <div class="voting-bar">
+          <div class="voting-timer-pill" :class="{ 'timer-alert': timeLeft <= 5 }">
+            <span>⏱️</span>
+            <span>{{ timeLeft }}s</span>
+          </div>
+          <div class="voting-instruction">⚡ Vote vite pour + de points !</div>
+        </div>
+
+        <div class="gamepad-grid">
+          <!-- Bouton 0 : Rouge (Triangle) -->
+          <button class="gamepad-btn btn-0" @click="submitAnswer(0)">
+            <span class="btn-icon-shape">▲</span>
+          </button>
+
+          <!-- Bouton 1 : Jaune (Losange) -->
+          <button class="gamepad-btn btn-1" @click="submitAnswer(1)">
+            <span class="btn-icon-shape">◆</span>
+          </button>
+
+          <!-- Bouton 2 : Vert (Cercle) -->
+          <button class="gamepad-btn btn-2" @click="submitAnswer(2)">
+            <span class="btn-icon-shape">●</span>
+          </button>
+
+          <!-- Bouton 3 : Bauxite (Carré) -->
+          <button class="gamepad-btn btn-3" @click="submitAnswer(3)">
+            <span class="btn-icon-shape">■</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- =====================================
+           ÉTAPE 4 : RÉPONSE ENVOYÉE OU TEMPS ÉCOULÉ (EN ATTENTE DE L'ANIMATEUR)
+           ===================================== -->
+      <section v-else-if="currentScreen === 'ANSWERED_WAIT' || currentScreen === 'TIME_UP_WAIT'" class="waiting-container">
+        <div class="waiting-pulse-circle">
+          <span>{{ currentScreen === 'TIME_UP_WAIT' ? '⏳' : '✓' }}</span>
+        </div>
+        <h2 class="waiting-title">
+          {{ currentScreen === 'TIME_UP_WAIT' ? 'Temps écoulé !' : 'Réponse enregistrée !' }}
+        </h2>
+        <p class="waiting-desc">
+          L'animateur va maintenant dévoiler la bonne réponse sur le grand écran...
+        </p>
+      </section>
+
+      <!-- =====================================
+           ÉTAPE 5 : RÉSULTAT DE LA QUESTION
+           ===================================== -->
+      <section 
+        v-else-if="currentScreen === 'QUESTION_RESULT'" 
+        class="result-container"
+        :class="lastResult.isCorrect ? 'is-correct' : 'is-wrong'">
+        
+        <div class="result-emoji">
+          {{ lastResult.isCorrect ? '🎉' : '❌' }}
+        </div>
+        
+        <h2 class="result-title">
+          {{ lastResult.isCorrect ? 'Bravo !' : 'Aïe, raté !' }}
+        </h2>
+
+        <div class="result-pts">
+          {{ lastResult.isCorrect ? '+' + lastResult.pointsAdded + ' PTS' : '+0 PT' }}
+        </div>
+
+        <div v-if="lastResult.isCorrect && lastResult.pointsAdded > 100" style="font-size: 0.95rem; font-weight: 800; opacity: 0.9;">
+          ⚡ Inclut +{{ lastResult.pointsAdded - 100 }} pts de bonus rapidité !
+        </div>
+
+        <div class="result-score-box">
+          Ton score actuel : <strong>{{ player.score }} pts</strong>
+        </div>
+      </section>
+
+      <!-- =====================================
+           ÉTAPE 6 : FIN DE PARTIE / PODIUM
+           ===================================== -->
+      <section v-else-if="currentScreen === 'PODIUM'" class="final-container">
+        <div class="final-badge">🇬🇳</div>
+        <h2 class="final-title">Quiz Terminé !</h2>
+        <p style="color: var(--text-muted); font-size: 1.1rem; font-weight: 700;">
+          Merci d'avoir participé à cet exposé interactif.
+        </p>
+        <div class="final-score-pill">
+          Score Final : {{ player.score }} pts
+        </div>
+        <p style="font-size: 0.95rem; color: var(--text-muted);">
+          Consulte le podium final sur le grand écran !
+        </p>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const { createApp, ref, onMounted } = Vue;
+
+    createApp({
+      setup() {
+        const socket = io();
+
+        const inputNickname = ref('');
+        const errorMessage = ref('');
+        const timeLeft = ref(20);
+
+        const player = ref({
+          isJoined: false,
+          nickname: '',
+          score: 0
+        });
+
+        // Écrans possibles : 'LOGIN', 'LOBBY_WAIT', 'VOTING', 'ANSWERED_WAIT', 'TIME_UP_WAIT', 'QUESTION_RESULT', 'PODIUM'
+        const currentScreen = ref('LOGIN');
+
+        const lastResult = ref({
+          isCorrect: false,
+          pointsAdded: 0
+        });
+
+        // Vibration haptique sur mobile si supportée
+        function triggerHaptic(duration = 50) {
+          if (navigator.vibrate) {
+            try {
+              navigator.vibrate(duration);
+            } catch (e) {}
+          }
+        }
+
+        // Action de connexion
+        function joinGame() {
+          errorMessage.value = '';
+          const nick = inputNickname.value.trim();
+          if (!nick) return;
+
+          socket.emit('player:join', { nickname: nick });
+        }
+
+        // Action de vote (choix 0, 1, 2, ou 3)
+        function submitAnswer(choiceIndex) {
+          triggerHaptic(80);
+          socket.emit('player:submit_answer', { choiceIndex });
+          currentScreen.value = 'ANSWERED_WAIT';
+        }
+
+        onMounted(() => {
+          // Succès de la connexion
+          socket.on('player:joined_success', (data) => {
+            player.value.isJoined = true;
+            player.value.nickname = data.nickname;
+            player.value.score = 0;
+            if (data.timeLeft !== undefined) timeLeft.value = data.timeLeft;
+
+            if (data.status === 'QUESTION_ACTIVE') {
+              if (data.votingClosed) {
+                currentScreen.value = 'TIME_UP_WAIT';
+              } else {
+                currentScreen.value = 'VOTING';
+              }
+            } else if (data.status === 'PODIUM') {
+              currentScreen.value = 'PODIUM';
+            } else {
+              currentScreen.value = 'LOBBY_WAIT';
+            }
+          });
+
+          // Erreur de connexion (pseudo déjà pris ou invalide)
+          socket.on('player:join_error', (data) => {
+            errorMessage.value = data.message;
+          });
+
+          // Début d'une nouvelle question
+          socket.on('player:question_start', (data) => {
+            if (data && data.totalTime) {
+              timeLeft.value = data.totalTime;
+            }
+            if (player.value.isJoined) {
+              currentScreen.value = 'VOTING';
+            }
+          });
+
+          // Tick du compte à rebours
+          socket.on('game:timer_tick', (data) => {
+            timeLeft.value = data.timeLeft;
+          });
+
+          // Clôture des votes (fin du temps ou tout le monde a voté)
+          socket.on('game:voting_closed', () => {
+            if (currentScreen.value === 'VOTING') {
+              currentScreen.value = 'TIME_UP_WAIT';
+            }
+          });
+
+          // Confirmation de réception de la réponse
+          socket.on('player:answer_received', () => {
+            currentScreen.value = 'ANSWERED_WAIT';
+          });
+
+          // Révélation du résultat de la question (déclenché par l'hôte)
+          socket.on('player:question_result', (data) => {
+            if (!player.value.isJoined) return;
+
+            lastResult.value = {
+              isCorrect: data.isCorrect,
+              pointsAdded: data.pointsAdded
+            };
+            player.value.score = data.totalScore;
+            currentScreen.value = 'QUESTION_RESULT';
+
+            if (data.isCorrect) {
+              triggerHaptic([60, 50, 100]);
+            } else {
+              triggerHaptic(120);
+            }
+          });
+
+          // Podium final
+          socket.on('game:podium', () => {
+            if (player.value.isJoined) {
+              currentScreen.value = 'PODIUM';
+            }
+          });
+
+          // Partie redémarrée
+          socket.on('game:restarted', () => {
+            if (player.value.isJoined) {
+              player.value.score = 0;
+              currentScreen.value = 'LOBBY_WAIT';
+            }
+          });
+        });
+
+        return {
+          inputNickname,
+          errorMessage,
+          player,
+          currentScreen,
+          lastResult,
+          timeLeft,
+          joinGame,
+          submitAnswer
+        };
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>

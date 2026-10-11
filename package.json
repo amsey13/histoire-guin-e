@@ -1,0 +1,13 @@
+{
+  "name": "guinea-history-quiz",
+  "version": "1.0.0",
+  "description": "Système de quiz en temps réel sur l'histoire de la Guinée (Kahoot-style)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "socket.io": "^4.8.1"
+  }
+}
